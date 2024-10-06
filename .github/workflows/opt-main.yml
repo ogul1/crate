@@ -1,0 +1,158 @@
+
+name: Modified CrateDB SQL
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+        - ubuntu-latest
+    steps:
+    - name: Setup Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |-
+        python -m pip install --upgrade pip
+        pip install inotify
+    - name: Run inotifywait
+      run: |-
+        python3 -c "
+        import inotify.adapters
+        import inotify.constants
+        import os
+        from datetime import datetime, timezone
+        with open('/home/runner/inotifywait-log-test (${{ matrix.os }}).csv', 'w') as log_file:
+          i = inotify.adapters.InotifyTree('/home/runner/work/crate/crate', inotify.constants.IN_CREATE | inotify.constants.IN_ACCESS)
+          for event in i.event_gen(yield_nones=False):
+            (_, type_names, path, filename) = event
+            now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f') + 'Z'
+            events = ','.join(type_names)
+            log_file.write(f'{now};{path};{filename};{events}\n')
+            log_file.flush()
+            os.fsync(log_file.fileno())
+        " &
+    - uses: actions/checkout@v4
+    - run: touch optcd-3.txt
+    - name: Setup Maven Java
+      uses: actions/setup-java@v4
+      with:
+        java-version: '22'
+        distribution: temurin
+        cache: maven
+    - run: touch optcd-4.txt
+    - name: Run tests on ${{ matrix.os }}
+      env:
+        CRATE_TESTS_SQL_REQUEST_TIMEOUT: '20'
+      run: |-
+        mvn test \
+          -Dtests.crate.run-windows-incompatible=true \
+          -DforkCount=2 \
+          -DthreadCount=2 \
+          -Dcheckstyle.skip \
+          -Dforbiddenapis.skip=true \
+          -Dmaven.javadoc.skip=true \
+          -Djacoco.skip=true
+    - run: touch optcd-5.txt
+    - name: Upload inotifywait logs
+      uses: actions/upload-artifact@v4
+      with:
+        name: inotifywait-test (${{ matrix.os }})
+        path: /home/runner/inotifywait-log-test (${{ matrix.os }}).csv
+  forbiddenApis:
+    name: forbiddenApis
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |-
+        python -m pip install --upgrade pip
+        pip install inotify
+    - name: Run inotifywait
+      run: |-
+        python3 -c "
+        import inotify.adapters
+        import inotify.constants
+        import os
+        from datetime import datetime, timezone
+        with open('/home/runner/inotifywait-log-forbiddenApis.csv', 'w') as log_file:
+          i = inotify.adapters.InotifyTree('/home/runner/work/crate/crate', inotify.constants.IN_CREATE | inotify.constants.IN_ACCESS)
+          for event in i.event_gen(yield_nones=False):
+            (_, type_names, path, filename) = event
+            now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f') + 'Z'
+            events = ','.join(type_names)
+            log_file.write(f'{now};{path};{filename};{events}\n')
+            log_file.flush()
+            os.fsync(log_file.fileno())
+        " &
+    - uses: actions/checkout@v4
+    - run: touch optcd-3.txt
+    - name: Setup Maven Java
+      uses: actions/setup-java@v4
+      with:
+        java-version: '22'
+        distribution: temurin
+        cache: maven
+    - run: touch optcd-4.txt
+    - name: Run forbiddenapis:check
+      run: |-
+        mvn compile forbiddenapis:check
+    - run: touch optcd-5.txt
+    - name: Upload inotifywait logs
+      uses: actions/upload-artifact@v4
+      with:
+        name: inotifywait-forbiddenApis
+        path: /home/runner/inotifywait-log-forbiddenApis.csv
+  checkstyle:
+    name: checkstyle
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |-
+        python -m pip install --upgrade pip
+        pip install inotify
+    - name: Run inotifywait
+      run: |-
+        python3 -c "
+        import inotify.adapters
+        import inotify.constants
+        import os
+        from datetime import datetime, timezone
+        with open('/home/runner/inotifywait-log-checkstyle.csv', 'w') as log_file:
+          i = inotify.adapters.InotifyTree('/home/runner/work/crate/crate', inotify.constants.IN_CREATE | inotify.constants.IN_ACCESS)
+          for event in i.event_gen(yield_nones=False):
+            (_, type_names, path, filename) = event
+            now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f') + 'Z'
+            events = ','.join(type_names)
+            log_file.write(f'{now};{path};{filename};{events}\n')
+            log_file.flush()
+            os.fsync(log_file.fileno())
+        " &
+    - uses: actions/checkout@v4
+    - run: touch optcd-3.txt
+    - name: Setup Maven Java
+      uses: actions/setup-java@v4
+      with:
+        java-version: 17
+        distribution: temurin
+    - run: touch optcd-4.txt
+    - name: Run checkstyle
+      run: mvn compile checkstyle:checkstyle
+    - run: touch optcd-5.txt
+    - name: Upload inotifywait logs
+      uses: actions/upload-artifact@v4
+      with:
+        name: inotifywait-checkstyle
+        path: /home/runner/inotifywait-log-checkstyle.csv
+'on':
+- push
+- workflow_dispatch
